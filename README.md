@@ -28,6 +28,22 @@ PHONIC_API_KEY=ph_your_api_key_here
 npm run dev
 ```
 
+## Session Tokens
+The app uses server actions to securely create session tokens for WebSocket authentication.
+Server actions run on the server side and are not accessible to the client.
+
+```typescript
+// Server action in actions.ts
+const sessionToken = await createSessionToken();
+// Token is used to authenticate WebSocket connection
+```
+
+## Agent Management
+The demo automatically creates an agent with a color-changing tool via `ensureOrbAgent()`. You can:
+- **Replace this** with your own agent setup
+- **Create agents** via Phonic SDK or dashboard UI
+- **Use existing agents** by changing the agent name in the config
+
 Visit [http://localhost:3000](http://localhost:3000) and start talking to your AI! 
 
 The demo includes a magical orb that changes color based on voice commands - try saying "Make the orb red" or "Change it to blue"!
