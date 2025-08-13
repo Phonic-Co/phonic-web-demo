@@ -72,48 +72,70 @@ export default function Home() {
   };
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Phonic Web Demo</h1>
-      <p className="mb-6">Status: {status}</p>
-      
-      <button
-        onClick={toggleConversation}
-        className={`px-4 py-2 rounded font-medium ${
-          isActive 
-            ? 'bg-red-500 hover:bg-red-600 text-white' 
-            : 'bg-blue-500 hover:bg-blue-600 text-white'
-        }`}
-      >
-        {isActive ? 'End Conversation' : 'Start Conversation'}
-      </button>
-      
-      {isCapturing && (
-        <p className="mt-4 text-red-600">🎤 Recording...</p>
-      )}
-      
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-4">Conversation</h2>
-        <div className="border rounded p-4 h-64 overflow-y-auto bg-gray-50">
-          {conversationItems.length === 0 ? (
-            <p className="text-gray-500">
-              {isActive ? "Say something to start..." : "No conversation yet"}
-            </p>
-          ) : (
-            conversationItems.map((item) => (
-              <div key={item.itemIdx} className="mb-4 p-2 border rounded bg-white">
-                <div className="font-medium text-sm text-gray-600 mb-1">
-                  {item.role === "user" ? "You" : "Assistant"}
-                </div>
-                <div>
-                  {item.text === null ? (
-                    <span className="text-gray-500 italic">Listening...</span>
-                  ) : (
-                    item.text
-                  )}
-                </div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Phonic Web Demo</h1>
+          <p className="text-gray-600">Real-time AI conversation</p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-4">Status: {status}</p>
+            
+            <button
+              onClick={toggleConversation}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                isActive 
+                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+            >
+              {isActive ? '🛑 End Conversation' : '🎤 Start Conversation'}
+            </button>
+            
+            {isCapturing && (
+              <p className="mt-4 text-red-600 font-medium">🎤 Recording...</p>
+            )}
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-semibold text-gray-800">Conversation</h2>
+          </div>
+          
+          <div className="p-4 h-80 overflow-y-auto">
+            {conversationItems.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                {isActive ? "Say something to start..." : "No conversation yet"}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {conversationItems.map((item) => (
+                  <div key={item.itemIdx} className="flex gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm ${
+                      item.role === "user" ? "bg-blue-500" : "bg-green-500"
+                    }`}>
+                      {item.role === "user" ? "U" : "A"}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs font-medium text-gray-500 mb-1">
+                        {item.role === "user" ? "You" : "Assistant"}
+                      </div>
+                      <div className="text-gray-800">
+                        {item.text === null ? (
+                          <span className="text-gray-500 italic">Listening...</span>
+                        ) : (
+                          item.text
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
