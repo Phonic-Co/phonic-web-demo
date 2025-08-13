@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Phonic Web Starter
 
-## Getting Started
+A complete React/Next.js starter template for building real-time AI voice conversation apps with Phonic's Speech-to-Speech API.
 
-First, run the development server:
+## ✨ What You Get
 
+- **Complete voice conversation UI** with animated orb visualization
+- **WebSocket tool integration** with live color-changing demo
+- **Secure authentication** using session tokens
+
+## 🚀 Quick Start
+
+### 1. Clone and Install
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <your-repo>
+cd phonic-web-demo
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Set Up Environment
+Create `.env.local` file:
+```env
+PHONIC_API_KEY=ph_your_api_key_here
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Run the App
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Visit [http://localhost:3000](http://localhost:3000) and start talking to your AI! 
 
-## Learn More
+The demo includes a magical orb that changes color based on voice commands - try saying "Make the orb red" or "Change it to blue"!
 
-To learn more about Next.js, take a look at the following resources:
+## 🏗️ Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── actions.ts              # Server actions (session tokens, agent setup)
+│   ├── hooks/
+│   │   ├── useConversation.ts  # Main conversation hook
+│   │   └── useMicPermission.ts # Microphone permission management
+│   └── page.tsx                # Main demo page
+├── components/
+│   └── AnimatedOrb.tsx         # Animated orb with color transitions
+├── lib/
+│   ├── phonic/                 # Phonic WebSocket client
+│   ├── audio/                  # Audio capture and processing
+│   └── types.ts                # Shared TypeScript types
+└── public/
+    └── pcm-processor.worklet.js # Audio worklet for microphone
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🎯 Core Features
 
-## Deploy on Vercel
+### Voice Conversation
+```typescript
+import { useConversation } from "./hooks/useConversation";
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+const {
+  status,                    // Connection status
+  conversationItems,         // Chat history
+  isMicrophoneEnabled,      // Mic state
+  isMuted,                  // Mute state
+  startConversation,        // Start function
+  stopConversation,         // Stop function
+  toggleMute,               // Mute/unmute
+} = useConversation({
+  wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL,
+  onToolCall: (toolCall) => {
+    // Handle tool calls from AI
+    console.log("Tool call:", toolCall.tool_name);
+  }
+});
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Tool Integration
+The demo includes a complete WebSocket tool example that lets Phonic change the orb color using websocket tools:
+
+```typescript
+// Tool call handler
+onToolCall: (toolCall) => {
+  if (toolCall.tool_name === "set_orb_color") {
+    const color = toolCall.parameters.color;
+    setOrbColor(color); // Update UI
+    
+    sendToolCallOutput({
+      tool_call_id: toolCall.tool_call_id,
+      output: { success: true, color: color }
+    });
+  }
+}
+```
+
+### Microphone Permissions
+Simple hook for managing microphone access:
+
+```typescript
+import { useMicPermission } from "./hooks/useMicPermission";
+
+const { hasPermission, requestPermission } = useMicPermission();
+```

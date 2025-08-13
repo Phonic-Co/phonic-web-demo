@@ -1,138 +1,195 @@
 "use client";
 
-import { useCallback } from "react";
-import { type ConfigMessage } from "@phonic-web/sdk";
-import { useAudioStream } from "./hooks/useAudioStream";
-import { useMicrophone } from "./hooks/useMicrophone";
-import { usePhonicClient } from "./hooks/usePhonicClient";
-import { base64ToInt16Array } from "./utils/base64";
+import { useState } from "react";
+import { type ConfigMessage } from "../lib/phonic";
+import { useConversation } from "./hooks/useConversation";
+import { useMicPermission } from "./hooks/useMicPermission";
+import { createSessionToken, ensureOrbAgent } from "./actions";
+import { AnimatedOrb } from "../components/AnimatedOrb";
 
 export default function Home() {
-  const wsBaseUrl = process.env.NEXT_PUBLIC_STS_WS_URL ?? "wss://api.phonic.co/v1/sts/ws";
-
-  const { startStream, stopStream, resumeStream, endStream, appendAudioChunk } = useAudioStream();
-
+  const [orbColor, setOrbColor] = useState("#808080");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { hasPermission, requestPermission } = useMicPermission();
+  
   const {
     status,
     conversationItems,
-    connect,
-    disconnect,
-    sendAudioChunk,
-    isConnected,
-  } = usePhonicClient({
-    wsBaseUrl,
-    onAudioChunk: (audioBase64) => {
-      const audioData = base64ToInt16Array(audioBase64);
-      appendAudioChunk(audioData);
+    isMicrophoneEnabled,
+    isMuted,
+    startConversation,
+    stopConversation,
+    sendToolCallOutput,
+    toggleMute,
+  } = useConversation({
+    wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL,
+    onToolCall: (toolCall) => {
+      console.log("Tool call received:", toolCall);
+      
+      // Example tool: set_orb_color
+      // Replace this with your own tool handling logic
+      if (toolCall.tool_name === "set_orb_color") {
+        const color = toolCall.parameters.color as string;
+        console.log("Setting orb color to:", color);
+        
+        // Validate hex color format
+        const hexRegex = /^#[0-9A-F]{6}$/i;
+        if (hexRegex.test(color)) {
+          setOrbColor(color);
+          sendToolCallOutput({
+            tool_call_id: toolCall.tool_call_id,
+            output: { success: true, color: color, message: `Orb color changed to ${color}` },
+          });
+        } else {
+          sendToolCallOutput({
+            tool_call_id: toolCall.tool_call_id,
+            output: { success: false, error: "Invalid hex color format. Use #RRGGBB format." },
+          });
+        }
+      }
     },
-    onUserStartedSpeaking: () => stopStream(),
-    onUserFinishedSpeaking: () => resumeStream(),
   });
-
-  const handlePcm = useCallback((pcm: Int16Array) => {
-    if (isConnected) {
-      sendAudioChunk(pcm);
-    }
-  }, [isConnected, sendAudioChunk]);
-
-  const { isCapturing, startCapture, stopCapture } = useMicrophone({
-    workletUrl: "/pcm-processor.worklet.js",
-    onPcm: handlePcm,
-    desiredSampleRate: 44100,
-  });
-
-  const isActive = isConnected && isCapturing;
 
   const toggleConversation = async () => {
-    if (isActive) {
-      // Stop conversation
-      stopCapture();
-      disconnect();
-      await endStream();
+    const isConversationActive = status === "ready" && isMicrophoneEnabled;
+    if (isConversationActive) {
+      await stopConversation();
     } else {
-      // Start conversation
       try {
-        startStream({ sampleRate: 44100 });
+        setErrorMessage(null); 
         
-        const config: ConfigMessage = { 
-          type: "config", 
-          input_format: "pcm_44100", 
-          output_format: "pcm_44100" 
+        // Ensure the orb agent exists before starting conversation
+        // Remove when you have created your own agent
+        const agentResponse = await ensureOrbAgent();
+        if (agentResponse.error) {
+          setErrorMessage(`Failed to setup orb agent: ${agentResponse.error.message}`);
+          return;
+        }
+
+        const config: ConfigMessage = {
+          type: "config",
+          agent: "orb-color-agent", // Replace with your own agent name
         };
-        await connect(config);
-        
-        // Small delay to ensure WebSocket is ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        await startCapture();
+
+        const tokenResponse = await createSessionToken();
+        if (tokenResponse.error || !tokenResponse.data) {
+          throw new Error(tokenResponse.error?.message ?? "Failed to create session token");
+        }
+
+        await startConversation(config, tokenResponse.data.sessionToken);
       } catch (error) {
         console.error("Failed to start conversation:", error);
+        setErrorMessage(`Failed to start conversation: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Phonic Web Demo</h1>
-          <p className="text-gray-600">Real-time AI conversation</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-4">Status: {status}</p>
+    <div className="h-screen bg-stone-50 p-8 flex">
+      <div className="max-w-2xl mx-auto flex-1 flex flex-col">
+        <div className="bg-white border border-stone-200 rounded-2xl text-sm flex flex-col h-full">
+          <div className="p-4 border-b border-stone-100 flex-shrink-0">
+            <h1 className="text-xl font-semibold">Phonic Web Demo</h1>
+            <p className="text-xs text-stone-500 mt-1">Status: {status}</p>
             
-            <button
-              onClick={toggleConversation}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                isActive 
-                  ? 'bg-red-500 hover:bg-red-600 text-white' 
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              {isActive ? '🛑 End Conversation' : '🎤 Start Conversation'}
-            </button>
-            
-            {isCapturing && (
-              <p className="mt-4 text-red-600 font-medium">🎤 Recording...</p>
+            {hasPermission === false && (
+              <div className="mt-2">
+                <span className="text-xs text-red-600">Microphone access needed. </span>
+                <button
+                  onClick={requestPermission}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                >
+                  Allow access
+                </button>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="text-red-600 text-sm">
+                  <strong>Error:</strong> {errorMessage}
+                </div>
+              </div>
             )}
           </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-800">Conversation</h2>
-          </div>
           
-          <div className="p-4 h-80 overflow-y-auto">
+          <div className="flex-1 px-4 pb-4 overflow-hidden flex flex-col">
+            <div className="flex-shrink-0 flex justify-center py-6">
+              <AnimatedOrb 
+                color={orbColor} 
+                isActive={status === "ready" && isMicrophoneEnabled && !isMuted} 
+              />
+            </div>
+
+            {/* Conversation messages */}
             {conversationItems.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
-                {isActive ? "Say something to start..." : "No conversation yet"}
-              </p>
+              <div className="flex-1 grid place-items-center text-stone-500">
+                <div className="text-center">
+                  <div className="font-medium text-stone-700 mb-1">Meet your magical orb!</div>
+                  <div className="text-sm">Start a conversation to change its color</div>
+                </div>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex-1 space-y-3 overflow-y-auto">
                 {conversationItems.map((item) => (
-                  <div key={item.itemIdx} className="flex gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm ${
-                      item.role === "user" ? "bg-blue-500" : "bg-green-500"
-                    }`}>
-                      {item.role === "user" ? "U" : "A"}
+                  <div key={item.itemIdx} className="space-y-1">
+                    <div className="text-xs font-medium text-stone-500">
+                      {item.role === "user" ? "You" : "Assistant"}
                     </div>
-                    <div className="flex-1">
-                      <div className="text-xs font-medium text-gray-500 mb-1">
-                        {item.role === "user" ? "You" : "Assistant"}
-                      </div>
-                      <div className="text-gray-800">
-                        {item.text === null ? (
-                          <span className="text-gray-500 italic">Listening...</span>
-                        ) : (
-                          item.text
-                        )}
-                      </div>
+                    <div className="text-stone-900">
+                      {item.text === null ? (
+                        <span className="text-stone-500 italic">Listening...</span>
+                      ) : (
+                        item.text
+                      )}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 flex justify-center gap-4 flex-shrink-0">
+            {!(status === "ready" && isMicrophoneEnabled) ? (
+              <button
+                onClick={toggleConversation}
+                className="flex items-center gap-2 px-6 py-2 bg-black text-white rounded-md font-medium hover:bg-stone-800 transition-colors"
+              >
+                Start conversation
+              </button>
+            ) : (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={toggleConversation}
+                  className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors"
+                >
+                  End conversation
+                </button>
+                
+                <button
+                  onClick={toggleMute}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                    isMuted 
+                      ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200" 
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  }`}
+                >
+                  {isMuted ? "Unmute" : "Mute"}
+                </button>
+              </div>
+            )}
+            
+            {isMicrophoneEnabled && !isMuted && (
+              <div className="flex items-center gap-2 text-stone-600">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-sm">Recording</span>
+              </div>
+            )}
+            
+            {isMicrophoneEnabled && isMuted && (
+              <div className="flex items-center gap-2 text-stone-600">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-sm">Muted</span>
               </div>
             )}
           </div>
