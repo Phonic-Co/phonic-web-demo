@@ -5,8 +5,6 @@ import { createSessionToken } from "../actions";
 type UsePhonicClientOptions = {
     wsBaseUrl: string;
     onAudioChunk?: (audioBase64: string) => void;
-    onConversationUpdate?: (items: ConversationItem[]) => void;
-    onStatusChange?: (status: string) => void;
     onUserStartedSpeaking?: () => void;
     onUserFinishedSpeaking?: () => void;
 };
@@ -14,8 +12,6 @@ type UsePhonicClientOptions = {
 export function usePhonicClient({
     wsBaseUrl,
     onAudioChunk,
-    onConversationUpdate,
-    onStatusChange,
     onUserStartedSpeaking,
     onUserFinishedSpeaking,
 }: UsePhonicClientOptions) {
@@ -25,8 +21,7 @@ export function usePhonicClient({
 
     const updateStatus = useCallback((newStatus: string) => {
         setStatus(newStatus);
-        onStatusChange?.(newStatus);
-    }, [onStatusChange]);
+    }, []);
 
     const connect = useCallback(async (config: ConfigMessage) => {
         try {
@@ -45,7 +40,6 @@ export function usePhonicClient({
             client.on((event) => {
                 const items = client.getConversationItems();
                 setConversationItems(items);
-                onConversationUpdate?.(items);
 
                 // Handle audio chunks
                 if (event.type === "audio_chunk") {
@@ -80,7 +74,7 @@ export function usePhonicClient({
             updateStatus(`error: ${errorMessage}`);
             throw error;
         }
-    }, [wsBaseUrl, onAudioChunk, onConversationUpdate, updateStatus]);
+    }, [wsBaseUrl, onAudioChunk, onUserStartedSpeaking, onUserFinishedSpeaking, updateStatus]);
 
     const disconnect = useCallback(() => {
         if (clientRef.current) {

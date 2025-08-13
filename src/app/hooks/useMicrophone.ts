@@ -15,7 +15,6 @@ export function useMicrophone({
     const micRef = useRef<ReturnType<typeof createMicrophoneCapture> | null>(null);
     const onPcmRef = useRef(onPcm);
     const [isCapturing, setIsCapturing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     // Update the callback ref when onPcm changes
     useEffect(() => {
@@ -23,34 +22,24 @@ export function useMicrophone({
     }, [onPcm]);
 
     const startCapture = useCallback(async () => {
-        try {
-            setError(null);
-
-            if (micRef.current) {
-                await micRef.current.start();
-                setIsCapturing(true);
-                return;
-            }
-
-            const mic = createMicrophoneCapture({
-                workletUrl,
-                onPcm: (pcm: Int16Array) => {
-                    onPcmRef.current?.(pcm);
-                },
-                desiredSampleRate,
-            });
-
-            await mic.start();
-            micRef.current = mic;
+        if (micRef.current) {
+            await micRef.current.start();
             setIsCapturing(true);
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : "Failed to start microphone";
-            setError(errorMessage);
-            setIsCapturing(false);
-            throw new Error(errorMessage);
+            return;
         }
-    }, [workletUrl, onPcm, desiredSampleRate]);
+
+        const mic = createMicrophoneCapture({
+            workletUrl,
+            onPcm: (pcm: Int16Array) => {
+                onPcmRef.current?.(pcm);
+            },
+            desiredSampleRate,
+        });
+
+        await mic.start();
+        micRef.current = mic;
+        setIsCapturing(true);
+    }, [workletUrl, desiredSampleRate]);
 
     const stopCapture = useCallback(() => {
         if (micRef.current) {
@@ -58,22 +47,11 @@ export function useMicrophone({
             micRef.current = null;
         }
         setIsCapturing(false);
-        setError(null);
     }, []);
-
-    const toggleCapture = useCallback(async () => {
-        if (isCapturing) {
-            stopCapture();
-        } else {
-            await startCapture();
-        }
-    }, [isCapturing, startCapture, stopCapture]);
 
     return {
         isCapturing,
-        error,
         startCapture,
         stopCapture,
-        toggleCapture,
     };
 }

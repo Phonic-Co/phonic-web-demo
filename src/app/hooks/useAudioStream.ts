@@ -1,32 +1,24 @@
 import { useCallback, useRef } from "react";
 
-type UseAudioStreamOptions = {
-    sampleRate?: number;
-    onAudioPlaybackComplete?: () => void;
-};
-
-export function useAudioStream({
-    sampleRate = 44100,
-    onAudioPlaybackComplete,
-}: UseAudioStreamOptions = {}) {
+export function useAudioStream() {
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioBufferRef = useRef<Float32Array[]>([]);
     const isPlayingRef = useRef(false);
     const nextTimeRef = useRef(0);
 
     const startStream = useCallback(
-        ({ sampleRate: customSampleRate }: { sampleRate?: number } = {}) => {
+        ({ sampleRate = 44100 }: { sampleRate?: number } = {}) => {
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext ||
                     (window as any).webkitAudioContext)({
-                        sampleRate: customSampleRate || sampleRate,
+                        sampleRate,
                     });
             }
             audioBufferRef.current = [];
             nextTimeRef.current = audioContextRef.current.currentTime;
             isPlayingRef.current = true;
         },
-        [sampleRate]
+        []
     );
 
     const stopStream = useCallback(() => {
@@ -48,9 +40,7 @@ export function useAudioStream({
             await audioContextRef.current.close();
             audioContextRef.current = null;
         }
-
-        onAudioPlaybackComplete?.();
-    }, [onAudioPlaybackComplete]);
+    }, []);
 
     const appendAudioChunk = useCallback((audioData: Int16Array | Uint8Array) => {
         if (!audioContextRef.current || !isPlayingRef.current) return;
