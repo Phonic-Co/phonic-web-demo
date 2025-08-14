@@ -22,7 +22,7 @@ export default function Home() {
     sendToolCallOutput,
     toggleMute,
   } = useConversation({
-    wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL,
+    wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL ?? "wss://api.phonic.co/v1/sts/ws",
     onToolCall: (toolCall) => {
       console.log("Tool call received:", toolCall);
       

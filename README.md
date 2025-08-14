@@ -83,7 +83,6 @@ const {
   stopConversation,         // Stop function
   toggleMute,               // Mute/unmute
 } = useConversation({
-  wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL,
   onToolCall: (toolCall) => {
     // Handle tool calls from AI
     console.log("Tool call:", toolCall.tool_name);
