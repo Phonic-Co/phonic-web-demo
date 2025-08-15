@@ -5,8 +5,10 @@ A complete React/Next.js starter template for building real-time AI voice conver
 ## ✨ What You Get
 
 - **Complete voice conversation UI** with animated orb visualization
+- **Enterprise-grade audio processing** using AudioWorklet for real-time streaming
 - **WebSocket tool integration** with live color-changing demo
 - **Secure authentication** using session tokens
+- **Robust state management** with proper cleanup between conversations
 
 ## 🚀 Quick Start
 
@@ -62,10 +64,13 @@ src/
 │   └── AnimatedOrb.tsx         # Animated orb with color transitions
 ├── lib/
 │   ├── phonic/                 # Phonic WebSocket client
-│   ├── audio/                  # Audio capture and processing
+│   ├── audio/                  # Audio capture and processing utilities
+│   ├── hooks/
+│   │   └── useAudioStream.ts   # AudioWorklet-based audio streaming
 │   └── types.ts                # Shared TypeScript types
 └── public/
-    └── pcm-processor.worklet.js # Audio worklet for microphone
+    ├── audio-processor.js       # AudioWorklet for real-time audio playback
+    └── pcm-processor.worklet.js # AudioWorklet for microphone capture
 ```
 
 ## 🎯 Core Features
@@ -82,6 +87,7 @@ const {
   startConversation,        // Start function
   stopConversation,         // Stop function
   toggleMute,               // Mute/unmute
+  sendToolCallOutput,       // Send tool call responses
 } = useConversation({
   onToolCall: (toolCall) => {
     // Handle tool calls from AI
@@ -116,3 +122,27 @@ import { useMicPermission } from "./hooks/useMicPermission";
 
 const { hasPermission, requestPermission } = useMicPermission();
 ```
+
+## 🎵 Audio Architecture
+
+This starter uses **enterprise-grade audio processing** for professional voice conversation quality:
+
+### Real-time Audio Streaming
+- **AudioWorklet-based processing** for low-latency audio playback
+- **Proper buffering** prevents audio gaps and timing drift
+- **Seamless interruptions** with instant buffer clearing
+- **Multi-format support** (PCM, μ-law) with auto-detection
+
+### Microphone Capture
+- **Optimized worklet** accumulates 1024-sample chunks for efficiency
+- **Worklet-level muting** for instant response without main thread delays
+- **Automatic cleanup** prevents memory leaks between conversations
+- **Robust error handling** with graceful fallbacks
+
+### State Management
+- **Complete conversation lifecycle** with proper cleanup
+- **No state leaks** between conversation sessions
+- **Automatic resets** for UI state (orb color, mute status)
+- **Memory-efficient** audio context management
+
+This architecture matches the production Phonic Playground for reliable, professional-grade voice conversations.

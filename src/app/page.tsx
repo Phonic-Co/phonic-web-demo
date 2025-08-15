@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { type ConfigMessage } from "../lib/phonic";
 import { useConversation } from "./hooks/useConversation";
 import { useMicPermission } from "./hooks/useMicPermission";
 import { createSessionToken, ensureOrbAgent } from "./actions";
 import { AnimatedOrb } from "../components/AnimatedOrb";
 
+const DEFAULT_ORB_COLOR = "#808080";
+
 export default function Home() {
-  const [orbColor, setOrbColor] = useState("#808080");
+  const [orbColor, setOrbColor] = useState(DEFAULT_ORB_COLOR);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { hasPermission, requestPermission } = useMicPermission();
   
@@ -22,7 +24,6 @@ export default function Home() {
     sendToolCallOutput,
     toggleMute,
   } = useConversation({
-    wsBaseUrl: process.env.NEXT_PUBLIC_STS_WS_URL ?? "wss://api.phonic.co/v1/sts/ws",
     onToolCall: (toolCall) => {
       console.log("Tool call received:", toolCall);
       
@@ -50,10 +51,18 @@ export default function Home() {
     },
   });
 
+  // Reset orb color when conversation ends (any reason)
+  useEffect(() => {
+    if (status === "disconnected" || status === "error" || status === "idle") {
+      setOrbColor(DEFAULT_ORB_COLOR);
+    }
+  }, [status]);
+
   const toggleConversation = async () => {
     const isConversationActive = status === "ready" && isMicrophoneEnabled;
     if (isConversationActive) {
       await stopConversation();
+      setOrbColor(DEFAULT_ORB_COLOR); // Reset orb color to default
     } else {
       try {
         setErrorMessage(null); 

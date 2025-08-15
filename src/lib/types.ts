@@ -11,7 +11,6 @@ export enum ConversationStatus {
 export type VoiceConversationConfig = {
     wsBaseUrl?: string;
     workletUrl?: string;
-    sampleRate?: number;
     onToolCall?: (toolCall: {
         tool_call_id: string;
         tool_name: string;

@@ -4,6 +4,8 @@ export type MicrophoneCapture = {
     start: () => Promise<void>;
     stop: () => void;
     isCapturing: () => boolean;
+    mute: () => void;
+    unmute: () => void;
 };
 
 export function createMicrophoneCapture(params: {
@@ -28,10 +30,12 @@ export function createMicrophoneCapture(params: {
         await ctx.audioWorklet.addModule(params.workletUrl);
         node = new AudioWorkletNode(ctx, "pcm-processor", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
         node.port.onmessage = (ev: MessageEvent) => {
-            const input = ev.data as Float32Array;
-            const resampled = resampleFloat32(input, ctx!.sampleRate, desired);
-            const int16 = floatToInt16(resampled);
-            if (int16.length > 0) params.onPcm(int16);
+            if (ev.data.type === "audio-recording-chunk") {
+                const input = ev.data.buffer as Float32Array;
+                const resampled = resampleFloat32(input, ctx!.sampleRate, desired);
+                const int16 = floatToInt16(resampled);
+                if (int16.length > 0) params.onPcm(int16);
+            }
         };
         source.connect(node);
         capturing = true;
@@ -55,5 +59,13 @@ export function createMicrophoneCapture(params: {
 
     const isCapturing = () => capturing;
 
-    return { start, stop, isCapturing };
+    const mute = () => {
+        node?.port.postMessage({ type: "mute" });
+    };
+
+    const unmute = () => {
+        node?.port.postMessage({ type: "unmute" });
+    };
+
+    return { start, stop, isCapturing, mute, unmute };
 }

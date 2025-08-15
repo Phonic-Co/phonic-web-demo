@@ -31,7 +31,6 @@ export type ConversationItem = {
     itemIdx: number;
     role: "user" | "assistant";
     text: string | null;
-    startedAt?: string;
 };
 
 export type Events =

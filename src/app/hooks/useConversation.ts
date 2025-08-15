@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState, useMemo } from "react";
 import { PhonicClient, type ConversationItem, type ConfigMessage } from "../../lib/phonic";
-import { createMicrophoneCapture, base64ToInt16Array } from "../../lib/audio";
+import { createMicrophoneCapture, base64ToInt16Array, base64ToUint8Array } from "../../lib/audio";
 import { ConversationStatus, type VoiceConversationConfig } from "../../lib/types";
+import { useAudioStream } from "../../lib/hooks/useAudioStream";
 
 /**
  * useConversation Hook - Complete Voice Conversation Management
@@ -20,7 +21,6 @@ import { ConversationStatus, type VoiceConversationConfig } from "../../lib/type
 const DEFAULT_CONFIG = {
     wsBaseUrl: "wss://api.phonic.co/v1/sts/ws",
     workletUrl: "/pcm-processor.worklet.js",
-    sampleRate: 44100,
     onToolCall: undefined,
 } as const;
 
@@ -36,65 +36,37 @@ export function useConversation(config: VoiceConversationConfig = {}) {
     // Refs
     const clientRef = useRef<PhonicClient | null>(null);
     const micRef = useRef<ReturnType<typeof createMicrophoneCapture> | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const nextTimeRef = useRef(0);
-    const isPlayingRef = useRef(false);
     const isMutedRef = useRef(false);
 
-    // Audio playback functions
-    const startAudioStream = useCallback(() => {
-        if (!audioContextRef.current) {
-            const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-            audioContextRef.current = new AudioContextClass({
-                sampleRate: fullConfig.sampleRate,
-            });
-        }
-        nextTimeRef.current = audioContextRef.current.currentTime;
-        isPlayingRef.current = true;
-    }, [fullConfig.sampleRate]);
-
-    const stopAudioStream = useCallback(() => {
-        isPlayingRef.current = false;
-    }, []);
-
-    const resumeAudioStream = useCallback(() => {
-        if (audioContextRef.current && !isPlayingRef.current) {
-            isPlayingRef.current = true;
-            nextTimeRef.current = audioContextRef.current.currentTime;
-        }
-    }, []);
-
-    const playAudioChunk = useCallback((audioData: Int16Array) => {
-        if (!audioContextRef.current || !isPlayingRef.current) return;
-
-        try {
-            // Convert Int16 to Float32
-            const float32Data = new Float32Array(audioData.length);
-            for (let i = 0; i < audioData.length; i++) {
-                float32Data[i] = audioData[i] / 32767;
-            }
-
-            // Create and schedule audio buffer
-            const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, audioContextRef.current.sampleRate);
-            audioBuffer.getChannelData(0).set(float32Data);
-
-            const source = audioContextRef.current.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioContextRef.current.destination);
-
-            const now = audioContextRef.current.currentTime;
-            const scheduledTime = Math.max(now, nextTimeRef.current);
-            source.start(scheduledTime);
-            nextTimeRef.current = scheduledTime + audioBuffer.duration;
-        } catch (error) {
-            console.error("Error playing audio:", error);
-        }
-    }, []);
+    // Audio stream management
+    const { startStream, stopStream, resumeStream, endStream, appendAudioChunk, resetStream } = useAudioStream({
+        onAudioPlaybackComplete: () => {
+            // Handle audio playback completion if needed
+        },
+    });
 
     // Start conversation
     const startConversation = useCallback(async (conversationConfig: ConfigMessage, sessionToken: string) => {
         try {
             setStatus(ConversationStatus.Connecting);
+
+            // Clean up any existing state first
+            if (clientRef.current) {
+                clientRef.current.close();
+                clientRef.current = null;
+            }
+            if (micRef.current) {
+                micRef.current.stop();
+                micRef.current = null;
+            }
+            await endStream();
+            resetStream();
+
+            // Reset state
+            setConversationItems([]);
+            setIsMicrophoneEnabled(false);
+            setIsMuted(false);
+            isMutedRef.current = false;
 
             // Initialize client
             const client = new PhonicClient(fullConfig.wsBaseUrl);
@@ -104,14 +76,15 @@ export function useConversation(config: VoiceConversationConfig = {}) {
                 setConversationItems(client.getConversationItems());
 
                 if (event.type === "audio_chunk") {
+                    // Auto-detect audio format and convert appropriately
                     const audioData = base64ToInt16Array(event.audio);
-                    playAudioChunk(audioData);
+                    appendAudioChunk(audioData);
                 }
 
                 if (event.type === "user_started_speaking") {
-                    stopAudioStream();
+                    stopStream();
                 } else if (event.type === "user_finished_speaking") {
-                    resumeAudioStream();
+                    resumeStream();
                 }
 
                 if (event.type === "tool_call") {
@@ -136,18 +109,16 @@ export function useConversation(config: VoiceConversationConfig = {}) {
             client.startConversation(conversationConfig);
             clientRef.current = client;
 
-            // Start audio
-            startAudioStream();
+            // Start audio stream with auto-detected sample rate
+            await startStream({ sampleRate: 44100 });
 
             // Start microphone
             const mic = createMicrophoneCapture({
                 workletUrl: fullConfig.workletUrl,
                 onPcm: (pcm: Int16Array) => {
-                    if (!isMutedRef.current) {
-                        client.sendAudioChunk(pcm);
-                    }
+                    client.sendAudioChunk(pcm);
                 },
-                desiredSampleRate: fullConfig.sampleRate,
+                desiredSampleRate: 44100,
             });
 
             await mic.start();
@@ -161,7 +132,7 @@ export function useConversation(config: VoiceConversationConfig = {}) {
             console.error("Failed to start conversation:", errorMessage);
             throw error;
         }
-    }, [fullConfig, startAudioStream, playAudioChunk, stopAudioStream, resumeAudioStream]);
+    }, [fullConfig, startStream, appendAudioChunk, stopStream, resumeStream, endStream, resetStream]);
 
     // Stop conversation
     const stopConversation = useCallback(async () => {
@@ -174,22 +145,19 @@ export function useConversation(config: VoiceConversationConfig = {}) {
         setIsMuted(false);
         isMutedRef.current = false;
 
-        // Stop client
+        // Stop client and reset its state
         if (clientRef.current) {
             clientRef.current.close();
+            clientRef.current.reset();
             clientRef.current = null;
         }
 
-        // Stop audio
-        isPlayingRef.current = false;
-        if (audioContextRef.current) {
-            await audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
+        // Stop audio stream
+        await endStream();
 
         setStatus(ConversationStatus.Disconnected);
         setConversationItems([]);
-    }, []);
+    }, [endStream]);
 
     // Send tool call output
     const sendToolCallOutput = useCallback((params: { tool_call_id: string; output: unknown }) => {
@@ -203,6 +171,16 @@ export function useConversation(config: VoiceConversationConfig = {}) {
         setIsMuted(prev => {
             const newMutedState = !prev;
             isMutedRef.current = newMutedState;
+
+            // Use worklet-level muting for better performance
+            if (micRef.current) {
+                if (newMutedState) {
+                    micRef.current.mute();
+                } else {
+                    micRef.current.unmute();
+                }
+            }
+
             return newMutedState;
         });
     }, []);
