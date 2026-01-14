@@ -1,2 +1,122 @@
-# phonic-web-demo
-Phonic Web Integration with Next.js
+# Phonic Web Starter
+
+A complete React/Next.js starter template for building real-time AI voice conversation apps with Phonic's Speech-to-Speech API.
+
+## ✨ What You Get
+
+- **Complete voice conversation UI** with animated orb visualization
+- **WebSocket tool integration** with live color-changing demo
+- **Secure authentication** using session tokens
+
+## 🚀 Quick Start
+
+### 1. Clone and Install
+```bash
+git clone <your-repo>
+cd phonic-web-demo
+npm install
+```
+
+### 2. Set Up Environment
+Create `.env.local` file:
+```env
+PHONIC_API_KEY=ph_your_api_key_here
+```
+
+### 3. Run the App
+```bash
+npm run dev
+```
+
+## Session Tokens
+The app uses server actions to securely create session tokens for WebSocket authentication.
+Server actions run on the server side and are not accessible to the client.
+
+```typescript
+// Server action in actions.ts
+const sessionToken = await createSessionToken();
+// Token is used to authenticate WebSocket connection
+```
+
+## Agent Management
+The demo automatically creates an agent with a color-changing tool via `ensureOrbAgent()`. You can:
+- **Replace this** with your own agent setup
+- **Create agents** via Phonic SDK or dashboard UI
+- **Use existing agents** by changing the agent name in the config
+
+Visit [http://localhost:3000](http://localhost:3000) and start talking to your AI! 
+
+The demo includes a magical orb that changes color based on voice commands - try saying "Make the orb red" or "Change it to blue"!
+
+## 🏗️ Project Structure
+
+```
+src/
+├── app/
+│   ├── actions.ts              # Server actions (session tokens, agent setup)
+│   ├── hooks/
+│   │   ├── useConversation.ts  # Main conversation hook
+│   │   └── useMicPermission.ts # Microphone permission management
+│   └── page.tsx                # Main demo page
+├── components/
+│   └── AnimatedOrb.tsx         # Animated orb with color transitions
+├── lib/
+│   ├── phonic/                 # Phonic WebSocket client
+│   ├── audio/                  # Audio capture and processing utilities
+│   ├── hooks/
+│   │   └── useAudioStream.ts   # AudioWorklet-based audio streaming
+│   └── types.ts                # Shared TypeScript types
+└── public/
+    ├── audio-processor.js       # AudioWorklet for real-time audio playback
+    └── pcm-processor.worklet.js # AudioWorklet for microphone capture
+```
+
+## 🎯 Core Features
+
+### Voice Conversation
+```typescript
+import { useConversation } from "./hooks/useConversation";
+
+const {
+  status,                    // Connection status
+  conversationItems,         // Chat history
+  isMicrophoneEnabled,      // Mic state
+  isMuted,                  // Mute state
+  startConversation,        // Start function
+  stopConversation,         // Stop function
+  toggleMute,               // Mute/unmute
+  sendToolCallOutput,       // Send tool call responses
+} = useConversation({
+  onToolCall: (toolCall) => {
+    // Handle tool calls from AI
+    console.log("Tool call:", toolCall.tool_name);
+  }
+});
+```
+
+### Tool Integration
+The demo includes a complete WebSocket tool example that lets Phonic change the orb color using websocket tools:
+
+```typescript
+// Tool call handler
+onToolCall: (toolCall) => {
+  if (toolCall.tool_name === "set_orb_color") {
+    const color = toolCall.parameters.color;
+    setOrbColor(color); // Update UI
+    
+    sendToolCallOutput({
+      tool_call_id: toolCall.tool_call_id,
+      output: { success: true, color: color }
+    });
+  }
+}
+```
+
+### Microphone Permissions
+Simple hook for managing microphone access:
+
+```typescript
+import { useMicPermission } from "./hooks/useMicPermission";
+
+const { hasPermission, requestPermission } = useMicPermission();
+```
