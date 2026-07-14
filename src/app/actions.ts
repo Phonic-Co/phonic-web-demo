@@ -1,6 +1,6 @@
 "use server";
 
-import { PhonicClient } from "phonic";
+import { PhonicClient, PhonicError } from "phonic";
 
 function getClient() {
     const apiKey = process.env.PHONIC_API_KEY;
@@ -15,9 +15,12 @@ function getClient() {
 }
 
 function errorMessage(err: unknown, fallback: string): string {
-    if (err && typeof err === "object" && "message" in err && typeof err.message === "string") {
-        return err.message;
+    if (err instanceof PhonicError) {
+        // API error bodies look like { error: { message } }
+        const body = err.body as { error?: { message?: string } } | undefined;
+        return body?.error?.message ?? err.message ?? fallback;
     }
+    if (err instanceof Error) return err.message;
     return fallback;
 }
 
