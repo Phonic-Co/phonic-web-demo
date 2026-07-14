@@ -7,6 +7,7 @@ export class PhonicClient {
     private items: Array<ConversationItem> = [];
     private nextItemIdx = 0;
     private isAssistantSpeaking = false;
+    private startNewAssistantItem = false;
     private isUserSpeaking = false;
     private audioQueue: Array<{ pcm: Int16Array; opts?: { firstChunkIsoDateTime?: string } }> = [];
 
@@ -90,6 +91,7 @@ export class PhonicClient {
         this.items = [];
         this.nextItemIdx = 0;
         this.isAssistantSpeaking = false;
+        this.startNewAssistantItem = false;
         this.isUserSpeaking = false;
         this.audioQueue = [];
         this.listeners.clear();
@@ -141,33 +143,31 @@ export class PhonicClient {
                 }
                 case "audio_chunk": {
                     const text: string = typeof msg.text === "string" ? msg.text : "";
-                    if (!this.isAssistantSpeaking) {
-                        this.items.push({
-                            itemIdx: this.nextItemIdx++,
-                            role: "assistant",
-                            text,
-                        });
-                        this.isAssistantSpeaking = true;
-                    } else {
+                    // Trailing chunks can arrive after assistant_finished_speaking;
+                    // empty-text chunks must never create transcript items.
+                    if (text !== "") {
                         const last = this.items[this.items.length - 1];
-                        if (last && last.role === "assistant") {
-                            this.items[this.items.length - 1] = {
-                                ...last,
-                                text: `${last.text ?? ""}${text}`,
-                            };
-                        } else {
+                        if (this.startNewAssistantItem || !last || last.role !== "assistant") {
                             this.items.push({
                                 itemIdx: this.nextItemIdx++,
                                 role: "assistant",
                                 text,
                             });
+                        } else {
+                            this.items[this.items.length - 1] = {
+                                ...last,
+                                text: `${last.text ?? ""}${text}`,
+                            };
                         }
+                        this.startNewAssistantItem = false;
                     }
                     this.emit({ type: "audio_chunk", audio: msg.audio, text });
                     break;
                 }
                 case "assistant_started_speaking": {
                     this.isAssistantSpeaking = true;
+                    // New turn: the next text chunk starts a fresh transcript item
+                    this.startNewAssistantItem = true;
                     this.emit({ type: "assistant_started_speaking" });
                     break;
                 }
