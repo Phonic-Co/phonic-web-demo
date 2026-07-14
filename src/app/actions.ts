@@ -2,7 +2,7 @@
 
 export async function createSessionToken() {
     const apiKey = process.env.PHONIC_API_KEY;
-    const baseUrl = process.env.PHONIC_API_BASE_URL || "https://api.phonic.co";
+    const baseUrl = process.env.PHONIC_API_BASE_URL || "https://api.phonic.ai";
 
     if (!apiKey) {
         return { data: null, error: { message: "PHONIC_API_KEY is not set" } } as const;
@@ -32,7 +32,7 @@ export async function createSessionToken() {
 
 export async function ensureOrbAgent() {
     const apiKey = process.env.PHONIC_API_KEY;
-    const baseUrl = process.env.PHONIC_API_BASE_URL || "https://api.phonic.co";
+    const baseUrl = process.env.PHONIC_API_BASE_URL || "https://api.phonic.ai";
 
     if (!apiKey) {
         return { data: null, error: { message: "PHONIC_API_KEY is not set" } } as const;

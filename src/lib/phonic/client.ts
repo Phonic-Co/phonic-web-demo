@@ -166,9 +166,14 @@ export class PhonicClient {
                     this.emit({ type: "audio_chunk", audio: msg.audio, text });
                     break;
                 }
-                case "audio_finished": {
+                case "assistant_started_speaking": {
+                    this.isAssistantSpeaking = true;
+                    this.emit({ type: "assistant_started_speaking" });
+                    break;
+                }
+                case "assistant_finished_speaking": {
                     this.isAssistantSpeaking = false;
-                    this.emit({ type: "audio_finished" });
+                    this.emit({ type: "assistant_finished_speaking" });
                     break;
                 }
                 case "user_started_speaking": {
@@ -186,44 +191,6 @@ export class PhonicClient {
                 case "user_finished_speaking": {
                     this.isUserSpeaking = false;
                     this.emit({ type: "user_finished_speaking" });
-                    break;
-                }
-                case "interrupted_response": {
-                    const text: string = typeof msg.text === "string" ? msg.text : "";
-                    const lastItem = this.items[this.items.length - 1];
-
-                    if (!lastItem || lastItem.role !== "user") {
-                        this.emit({ type: "interrupted_response", text });
-                        break;
-                    }
-
-                    const secondLastItem = this.items[this.items.length - 2];
-
-                    if (!secondLastItem) {
-                        if (text === "") {
-                            this.items = this.items.slice(0, -1);
-                        }
-                        this.emit({ type: "interrupted_response", text });
-                        break;
-                    }
-
-                    if (secondLastItem.role === "user") {
-                        this.emit({ type: "interrupted_response", text });
-                        break;
-                    }
-
-                    if (secondLastItem.role === "assistant") {
-                        if (text === "") {
-                            this.items = this.items.slice(0, -2);
-                        } else {
-                            this.items[this.items.length - 2] = {
-                                ...secondLastItem,
-                                text,
-                            };
-                        }
-                    }
-
-                    this.emit({ type: "interrupted_response", text });
                     break;
                 }
                 case "tool_call":

@@ -19,7 +19,7 @@ import { useAudioStream } from "../../lib/hooks/useAudioStream";
  */
 
 const DEFAULT_CONFIG = {
-    wsBaseUrl: "wss://api.phonic.co/v1/sts/ws",
+    wsBaseUrl: "wss://api.phonic.ai/v1/sts/ws",
     workletUrl: "/pcm-processor.worklet.js",
     onToolCall: undefined,
 } as const;

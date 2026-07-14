@@ -13,8 +13,6 @@ export type ConfigMessage = {
     vad_min_speech_duration_ms?: number;
     vad_min_silence_duration_ms?: number;
     vad_threshold?: number;
-    enable_documents_rag?: boolean;
-    enable_transcripts_rag?: boolean;
     no_input_poke_sec?: number | null;
     no_input_poke_text?: string;
     no_input_end_conversation_sec?: number;
@@ -39,10 +37,10 @@ export type Events =
     | { type: "error"; error: unknown }
     | { type: "input_text"; text: string }
     | { type: "audio_chunk"; audio: string; text: string }
-    | { type: "audio_finished" }
+    | { type: "assistant_started_speaking" }
+    | { type: "assistant_finished_speaking" }
     | { type: "user_started_speaking" }
     | { type: "user_finished_speaking" }
-    | { type: "interrupted_response"; text: string }
     | {
         type: "tool_call";
         tool_call_id: string;
