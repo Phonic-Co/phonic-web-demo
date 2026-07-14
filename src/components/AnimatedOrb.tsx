@@ -15,8 +15,15 @@ export function AnimatedOrb({ color, isActive = false }: AnimatedOrbProps) {
   }, []);
 
   if (!mounted) {
+    // Same visual as the mounted main orb so the color doesn't jump on hydration
     return (
-      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-600" />
+      <div
+        className="w-32 h-32 rounded-full"
+        style={{
+          background: `radial-gradient(circle at 30% 30%, ${color}ff, ${color}cc, ${color}99)`,
+          boxShadow: `0 0 30px ${color}60, inset 0 0 20px ${color}40`,
+        }}
+      />
     );
   }
 
