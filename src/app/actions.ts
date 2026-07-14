@@ -48,10 +48,13 @@ export async function ensureOrbAgent() {
     const agentName = "orb-color-agent";
 
     try {
-        // Ensure the tool exists
-        try {
-            await client.tools.get(toolName);
-        } catch {
+        // Ensure the tool exists (404 -> create; other errors surface below)
+        const existingTool = await client.tools.get(toolName).catch((err) => {
+            if (err instanceof PhonicError && err.statusCode === 404) return null;
+            throw err;
+        });
+
+        if (!existingTool) {
             await client.tools.create({
                 name: toolName,
                 description: "Changes the color of the orb display to any hex color",
